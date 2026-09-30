@@ -1,0 +1,101 @@
+import type { User } from "@/types";
+
+/**
+ * Fictional platform members. Organizers are referenced by initiatives via
+ * `organizerId`. Avatars are generated from initials, so each user carries
+ * a background color instead of an image URL.
+ */
+export const users: User[] = [
+  {
+    id: "usr-01",
+    name: "أمينة بلحاج",
+    role: "organizer",
+    wilayaSlug: "alger",
+    bio: "مهندسة بيئة ومؤسِّسة مبادرات تطوعية للتشجير في العاصمة.",
+    joinedAt: "2022-03-14",
+    avatarColor: "bg-primary",
+    skills: ["إدارة المشاريع البيئية", "التنسيق التطوعي", "التواصل المجتمعي"],
+    interests: ["البيئة", "التشجير", "الصحة النفسية"],
+  },
+  {
+    id: "usr-02",
+    name: "ياسين مرابط",
+    role: "organizer",
+    wilayaSlug: "oran",
+    bio: "مطور ويب يقود مبادرات تكوين رقمي مجاني للشباب.",
+    joinedAt: "2021-11-02",
+    avatarColor: "bg-accent",
+  },
+  {
+    id: "usr-03",
+    name: "سارة بن يوسف",
+    role: "organizer",
+    wilayaSlug: "constantine",
+    bio: "أستاذة تعليم ابتدائي ومنسقة نوادي دعم مدرسي.",
+    joinedAt: "2023-01-20",
+    avatarColor: "bg-dark",
+  },
+  {
+    id: "usr-04",
+    name: "عبد النور شريف",
+    role: "organizer",
+    wilayaSlug: "setif",
+    bio: "طبيب عام ينظم حملات التبرع بالدم والتوعية الصحية.",
+    joinedAt: "2020-09-05",
+    avatarColor: "bg-primary",
+  },
+  {
+    id: "usr-05",
+    name: "خديجة عمراني",
+    role: "organizer",
+    wilayaSlug: "tlemcen",
+    bio: "ناشطة جمعوية تعمل على تمكين النساء الريفيات اقتصاديًا.",
+    joinedAt: "2022-06-18",
+    avatarColor: "bg-accent",
+  },
+  {
+    id: "usr-06",
+    name: "محمد الأمين قاسمي",
+    role: "organizer",
+    wilayaSlug: "el-oued",
+    bio: "مهندس فلاحي يقود مشاريع الزراعة الواحية المستدامة.",
+    joinedAt: "2023-04-11",
+    avatarColor: "bg-dark",
+  },
+  {
+    id: "usr-07",
+    name: "نور الهدى زروقي",
+    role: "organizer",
+    wilayaSlug: "bejaia",
+    bio: "منسقة ثقافية تعمل على توثيق التراث الأمازيغي المحلي.",
+    joinedAt: "2021-02-27",
+    avatarColor: "bg-primary",
+  },
+  {
+    id: "usr-08",
+    name: "إسلام حمدي",
+    role: "organizer",
+    wilayaSlug: "annaba",
+    bio: "مدرب رياضي شاب يؤطر مخيمات صيفية لأطفال الأحياء الشعبية.",
+    joinedAt: "2023-07-09",
+    avatarColor: "bg-accent",
+  },
+  {
+    id: "usr-09",
+    name: "لمياء بوزيد",
+    role: "organizer",
+    wilayaSlug: "batna",
+    bio: "أخصائية اجتماعية تنسق حملات التضامن الشتوي والكسوة.",
+    joinedAt: "2020-12-01",
+    avatarColor: "bg-dark",
+  },
+  {
+    id: "usr-10",
+    name: "توفيق بن عيسى",
+    role: "organizer",
+    wilayaSlug: "ghardaia",
+    bio: "رائد أعمال شاب يرافق حاملي المشاريع الصغيرة في الجنوب.",
+    joinedAt: "2022-10-30",
+    avatarColor: "bg-primary",
+  },
+];

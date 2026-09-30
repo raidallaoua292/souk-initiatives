@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand palette */
+  --color-primary: #0d6b58;
+  --color-primary-dark: #094a3d;
+  --color-primary-light: #12946f;
+  --color-background: #f5efe6;
+  --color-accent: #cb7938;
+  --color-accent-dark: #a35f28;
+  --color-accent-light: #e0954f;
+  --color-dark: #24332e;
+
+  /* Arabic-first font stack (Cairo primary, Tajawal fallback), both
+     self-hosted through @fontsource. */
+  --font-arabic: "Cairo", "Tajawal", "Segoe UI", Tahoma, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-dark);
+}
+
+/* Nicer default focus ring across the app, RTL-agnostic. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
