@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Menu, X, Store, Plus } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/", label: "الرئيسية" },
   { href: "/initiatives", label: "المبادرات" },
+  { href: "/people", label: "الأشخاص" },
   { href: "/dashboard", label: "لوحة التحكم" },
 ];
 
@@ -41,22 +43,25 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="hidden md:block">
-          <Button href="/initiatives/new" size="sm" icon={<Plus className="h-4 w-4" />}>
-            انشر مبادرتك
-          </Button>
-        </div>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <div className="hidden md:block">
+            <Button href="/initiatives/new" size="sm" icon={<Plus className="h-4 w-4" />}>
+              انشر مبادرتك
+            </Button>
+          </div>
 
-        <button
-          type="button"
-          onClick={() => setIsMenuOpen((open) => !open)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-dark hover:bg-dark/5 md:hidden"
-          aria-expanded={isMenuOpen}
-          aria-controls="mobile-menu"
-          aria-label={isMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
-        >
-          {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((open) => !open)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-dark hover:bg-dark/5 md:hidden"
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
+            aria-label={isMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
+          >
+            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </Container>
 
       <div

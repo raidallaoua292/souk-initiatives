@@ -5,10 +5,14 @@ import type {
   Application,
   ApplicationWithRelations,
   Category,
+  Conversation,
+  ConversationWithRelations,
   DashboardStats,
   Initiative,
   InitiativeWithRelations,
+  Message,
   MockStoreSeed,
+  Notification,
   ParticipationRole,
   StoreNotice,
   User,
@@ -31,7 +35,26 @@ import {
   type JoinEligibility,
   type ReviewDecision,
 } from "@/lib/applications";
-import { fail, type Result } from "@/lib/result";
+import {
+  onApplicationAccepted,
+  onApplicationRejected,
+  onApplicationSubmitted,
+  onApplicationWithdrawn,
+  onMemberRemoved,
+  onMemberRoleChanged,
+  onMessageSent,
+  countUnread,
+  type EventContext,
+} from "@/lib/notifications";
+import {
+  buildConversation,
+  byOldestMessage,
+  composeMessage,
+  countUnreadMessages,
+  findConversation,
+  getOtherParticipantId,
+} from "@/lib/messaging";
+import { fail, ok, type Result } from "@/lib/result";
 import {
   createInitiativeRecord,
   updateInitiativeRecord,
@@ -40,7 +63,13 @@ import {
 import { applyProfileValues, type ProfileFormValues } from "@/lib/forms/profile-form";
 import { todayIsoDate } from "@/lib/utils";
 import { computeDashboardStats, createInitialState, mockStoreReducer } from "./reducer";
-import { selectApplications, selectOwnedInitiatives } from "./selectors";
+import {
+  selectApplications,
+  selectConversations,
+  selectNotifications,
+  selectOwnedInitiatives,
+  selectUserLookup,
+} from "./selectors";
 
 /** Shown wherever data was just changed, so nobody mistakes it for real persistence. */
 export const TEMPORARY_DATA_NOTE =
@@ -83,12 +112,39 @@ export interface MockStore {
   reviewApplication: (applicationId: string, decision: ReviewDecision, note: string) => Result<Application>;
   changeMemberRole: (applicationId: string, role: ParticipationRole) => Result<Application>;
   removeMember: (applicationId: string) => Result<Application>;
+
+  /* ---------------------------- Notifications ---------------------------- */
+  /** The current user's notifications, newest first. */
+  notifications: Notification[];
+  getNotifications: () => Notification[];
+  getUnreadNotificationsCount: () => number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+
+  /* ------------------------------ Messaging ------------------------------ */
+  /** The current user's conversations, most recently active first. */
+  conversations: ConversationWithRelations[];
+  getConversations: () => ConversationWithRelations[];
+  getConversation: (id: string) => ConversationWithRelations | undefined;
+  /** Messages of one conversation, oldest first. */
+  getMessages: (conversationId: string) => Message[];
+  /** Unread messages for the current user; all conversations when no id is given. */
+  getUnreadMessagesCount: (conversationId?: string) => number;
+  sendMessage: (conversationId: string, content: string) => Result<Message>;
+  markConversationAsRead: (conversationId: string) => void;
+  /** Opens (or reuses) the 1-to-1 conversation with `participantId`, optionally about an initiative. */
+  startConversation: (participantId: string, initiativeId?: string) => Result<Conversation>;
 }
 
 const MockStoreContext = createContext<MockStore | null>(null);
 
 function generateLocalId(prefix = "local"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** Ids and clock for building notifications. Only call from event handlers, never during render. */
+function newEventContext(): EventContext {
+  return { newId: () => generateLocalId("ntf"), now: new Date().toISOString() };
 }
 
 const NOT_FOUND = "لم يتم العثور على هذا الطلب.";
@@ -111,6 +167,7 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
       before: Application,
       result: Result<Application>,
       buildNotice: (after: Application) => StoreNotice,
+      buildNotifications: (after: Application, ctx: EventContext) => Notification[],
     ): Result<Application> => {
       if (result.ok) {
         dispatch({
@@ -118,12 +175,17 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
           application: result.value,
           expectedStatus: before.status,
           membersDelta: membersDelta(before.status, result.value.status),
+          notifications: buildNotifications(result.value, newEventContext()),
           notice: buildNotice(result.value),
         });
       }
       return result;
     };
     const applicantName = (id: string) => allApplications.find((a) => a.id === id)?.applicant.name ?? "المتقدّم";
+    const initiativeOf = (applicationId: string) => allApplications.find((a) => a.id === applicationId)?.initiative;
+    const users = selectUserLookup(state, seed);
+    const notifications = selectNotifications(state);
+    const conversations = selectConversations(state, seed, hydrated);
 
     return {
       currentUser: state.currentUser,
@@ -224,6 +286,12 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
             type: "application/added",
             application: result.value,
             snapshot: initiative,
+            notifications: onApplicationSubmitted(newEventContext(), {
+              application: result.value,
+              initiativeTitle: initiative.title,
+              ownerId: initiative.organizerId,
+              applicantName: state.currentUser.name,
+            }),
             notice: {
               tone: "success",
               message: `تم إرسال طلبك للانضمام إلى "${initiative.title}" وهو الآن قيد المراجعة. ${TEMPORARY_DATA_NOTE}`,
@@ -236,11 +304,21 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
       withdrawApplication: (applicationId) => {
         const before = state.applications.find((a) => a.id === applicationId);
         if (!before) return fail(NOT_FOUND);
-        const title = allApplications.find((a) => a.id === applicationId)?.initiative.title ?? "";
+        const initiative = initiativeOf(applicationId);
+        const title = initiative?.title ?? "";
         return commitUpdate(
           before,
           withdrawApplicationRule(before, { userId: state.currentUser.id, now: new Date().toISOString() }),
           () => ({ tone: "info", message: `تم سحب طلبك للانضمام إلى "${title}".` }),
+          (after, ctx) =>
+            initiative
+              ? onApplicationWithdrawn(ctx, {
+                  application: after,
+                  initiativeTitle: title,
+                  ownerId: initiative.organizerId,
+                  applicantName: state.currentUser.name,
+                })
+              : [],
         );
       },
 
@@ -248,6 +326,11 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
         const before = state.applications.find((a) => a.id === applicationId);
         if (!before) return fail(NOT_FOUND);
         const name = applicantName(applicationId);
+        const title = initiativeOf(applicationId)?.title ?? "";
+        // People already on the team (before this decision) hear about a newcomer.
+        const teamMemberIds = getTeamMembers(
+          allApplications.filter((a) => a.initiativeId === before.initiativeId),
+        ).map((a) => a.applicantId);
         return commitUpdate(
           before,
           reviewApplicationRule(before, {
@@ -267,6 +350,20 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
               ? { action: { label: "عرض الفريق", href: `/dashboard/initiatives/${after.initiativeId}/team` } }
               : {}),
           }),
+          (after, ctx) =>
+            decision === "ACCEPT"
+              ? onApplicationAccepted(ctx, {
+                  application: after,
+                  initiativeTitle: title,
+                  reviewerId: state.currentUser.id,
+                  applicantName: name,
+                  teamMemberIds,
+                })
+              : onApplicationRejected(ctx, {
+                  application: after,
+                  initiativeTitle: title,
+                  reviewerId: state.currentUser.id,
+                }),
         );
       },
 
@@ -274,6 +371,7 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
         const before = state.applications.find((a) => a.id === applicationId);
         if (!before) return fail(NOT_FOUND);
         const name = applicantName(applicationId);
+        const title = initiativeOf(applicationId)?.title ?? "";
         return commitUpdate(
           before,
           changeMemberRoleRule(before, {
@@ -282,6 +380,13 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
             now: new Date().toISOString(),
           }),
           (after) => ({ tone: "success", message: `تم تغيير دور ${name} إلى "${ROLE_LABELS[after.role]}".` }),
+          (after, ctx) =>
+            onMemberRoleChanged(ctx, {
+              application: after,
+              previousRole: before.role,
+              initiativeTitle: title,
+              actorId: state.currentUser.id,
+            }),
         );
       },
 
@@ -289,11 +394,80 @@ export function MockStoreProvider({ seed, children }: MockStoreProviderProps) {
         const before = state.applications.find((a) => a.id === applicationId);
         if (!before) return fail(NOT_FOUND);
         const name = applicantName(applicationId);
+        const title = initiativeOf(applicationId)?.title ?? "";
         return commitUpdate(
           before,
           removeMemberRule(before, { ownsInitiative: ownedIds.has(before.initiativeId), now: new Date().toISOString() }),
           () => ({ tone: "info", message: `تمت إزالة ${name} من فريق المبادرة.` }),
+          (after, ctx) =>
+            onMemberRemoved(ctx, { application: after, initiativeTitle: title, actorId: state.currentUser.id }),
         );
+      },
+
+      notifications,
+      getNotifications: () => notifications,
+      getUnreadNotificationsCount: () => countUnread(notifications),
+      markNotificationAsRead: (id) => dispatch({ type: "notification/read", id, now: new Date().toISOString() }),
+      markAllNotificationsAsRead: () => dispatch({ type: "notifications/allRead", now: new Date().toISOString() }),
+
+      conversations,
+      getConversations: () => conversations,
+      getConversation: (id) => conversations.find((c) => c.id === id),
+      getMessages: (conversationId) =>
+        state.messages.filter((m) => m.conversationId === conversationId).sort(byOldestMessage),
+      getUnreadMessagesCount: (conversationId) =>
+        countUnreadMessages(
+          state.messages.filter((m) =>
+            state.conversations.some((c) => c.id === m.conversationId && c.participantIds.includes(state.currentUser.id)),
+          ),
+          state.currentUser.id,
+          conversationId,
+        ),
+
+      sendMessage: (conversationId, content) => {
+        const conversation = state.conversations.find((c) => c.id === conversationId);
+        if (!conversation) return fail("لم يتم العثور على هذه المحادثة.");
+        const now = new Date().toISOString();
+        const result = composeMessage({
+          id: generateLocalId("msg"),
+          conversation,
+          senderId: state.currentUser.id,
+          content,
+          now,
+        });
+        if (!result.ok) return result;
+        const recipientId = getOtherParticipantId(conversation, state.currentUser.id);
+        dispatch({
+          type: "message/sent",
+          message: result.value,
+          notifications: recipientId
+            ? onMessageSent(newEventContext(), {
+                message: result.value,
+                conversation,
+                senderName: state.currentUser.name,
+                recipientId,
+              })
+            : [],
+        });
+        return result;
+      },
+
+      markConversationAsRead: (conversationId) =>
+        dispatch({ type: "conversation/read", conversationId, now: new Date().toISOString() }),
+
+      startConversation: (participantId, initiativeId) => {
+        if (!users.has(participantId)) return fail("لم يتم العثور على هذا المستخدم.");
+        const existing = findConversation(state.conversations, state.currentUser.id, participantId, initiativeId);
+        if (existing) return ok(existing);
+        const created = buildConversation({
+          id: generateLocalId("conv"),
+          userId: state.currentUser.id,
+          otherUserId: participantId,
+          initiativeId,
+          now: new Date().toISOString(),
+        });
+        if (created.ok) dispatch({ type: "conversation/started", conversation: created.value });
+        return created;
       },
     };
   }, [seed, state]);

@@ -16,6 +16,9 @@ interface SearchBarProps {
    * navigates to `/initiatives?query=...` (used in the homepage hero).
    */
   onSearch?: (query: string) => void;
+  /** Accessible label and input id; default to the initiative search. */
+  label?: string;
+  id?: string;
 }
 
 export function SearchBar({
@@ -24,6 +27,8 @@ export function SearchBar({
   className,
   size = "md",
   onSearch,
+  label = "ابحث عن مبادرة",
+  id = "initiative-search",
 }: SearchBarProps) {
   const [value, setValue] = useState(defaultValue);
   const router = useRouter();
@@ -50,12 +55,12 @@ export function SearchBar({
         className,
       )}
     >
-      <label htmlFor="initiative-search" className="sr-only">
-        ابحث عن مبادرة
+      <label htmlFor={id} className="sr-only">
+        {label}
       </label>
       <Search className="ms-2 h-5 w-5 shrink-0 text-dark/40" aria-hidden="true" />
       <input
-        id="initiative-search"
+        id={id}
         type="search"
         value={value}
         onChange={(event) => {

@@ -7,7 +7,7 @@ import { DashboardNotices } from "@/components/dashboard/DashboardNotices";
 export default function DashboardShellLayout({ children }: { children: ReactNode }) {
   return (
     <Container className="py-8 sm:py-10">
-      <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-8">
         <DashboardSidebar />
         <div className="space-y-6">
           <DashboardNotices />

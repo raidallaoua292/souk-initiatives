@@ -1,14 +1,23 @@
 import { ApplicationStatus } from "@/types";
 import type {
   Application,
+  Conversation,
   DashboardStats,
   Initiative,
   InitiativeWithRelations,
+  Message,
   MockStoreSeed,
+  Notification,
   StoreNotice,
   User,
 } from "@/types";
 import { findActiveApplication } from "@/lib/applications/domain";
+import {
+  markAllNotificationsRead,
+  markConversationNotificationsRead,
+  markNotificationRead,
+} from "@/lib/notifications/domain";
+import { markConversationRead, withLastMessage } from "@/lib/messaging/domain";
 
 /** Client-side mock state. Lives in memory only — a page refresh resets it. */
 export interface MockStoreState {
@@ -19,6 +28,10 @@ export interface MockStoreState {
   applications: Application[];
   /** Public initiatives the user applied to (needed to display those applications). */
   initiativeSnapshots: InitiativeWithRelations[];
+  /** Notifications for every user the mock knows about; the UI only shows the current user's. */
+  notifications: Notification[];
+  conversations: Conversation[];
+  messages: Message[];
   notice: StoreNotice | null;
 }
 
@@ -32,6 +45,8 @@ export type MockStoreAction =
       application: Application;
       /** Registered so the application can be displayed even though the initiative isn't owned. */
       snapshot: InitiativeWithRelations;
+      /** Notifications that follow from this event (e.g. "new application" for the owner). */
+      notifications: Notification[];
       notice: StoreNotice;
     }
   | {
@@ -41,8 +56,14 @@ export type MockStoreAction =
       expectedStatus: ApplicationStatus;
       /** Team-size change on the owning initiative (+1 join, -1 leave, 0 otherwise). */
       membersDelta: number;
+      notifications: Notification[];
       notice: StoreNotice;
     }
+  | { type: "notification/read"; id: string; now: string }
+  | { type: "notifications/allRead"; now: string }
+  | { type: "conversation/started"; conversation: Conversation }
+  | { type: "conversation/read"; conversationId: string; now: string }
+  | { type: "message/sent"; message: Message; notifications: Notification[] }
   | { type: "store/reset"; seed: MockStoreSeed; notice: StoreNotice }
   | { type: "notice/dismissed" };
 
@@ -52,6 +73,9 @@ export function createInitialState(seed: MockStoreSeed): MockStoreState {
     initiatives: seed.initiatives,
     applications: seed.applications,
     initiativeSnapshots: seed.initiativeSnapshots,
+    notifications: seed.notifications,
+    conversations: seed.conversations,
+    messages: seed.messages,
     notice: null,
   };
 }
@@ -91,6 +115,7 @@ export function mockStoreReducer(state: MockStoreState, action: MockStoreAction)
       return {
         ...state,
         applications: [application, ...state.applications],
+        notifications: [...action.notifications, ...state.notifications],
         initiativeSnapshots: owned || hasSnapshot ? state.initiativeSnapshots : [...state.initiativeSnapshots, snapshot],
         notice: action.notice,
       };
@@ -104,6 +129,7 @@ export function mockStoreReducer(state: MockStoreState, action: MockStoreAction)
       return {
         ...state,
         applications: state.applications.map((a) => (a.id === action.application.id ? action.application : a)),
+        notifications: [...action.notifications, ...state.notifications],
         initiatives:
           action.membersDelta === 0
             ? state.initiatives
@@ -113,6 +139,45 @@ export function mockStoreReducer(state: MockStoreState, action: MockStoreAction)
                   : item,
               ),
         notice: action.notice,
+      };
+    }
+
+    case "notification/read": {
+      const notifications = markNotificationRead(state.notifications, action.id, state.currentUser.id, action.now);
+      return notifications === state.notifications ? state : { ...state, notifications };
+    }
+    case "notifications/allRead": {
+      const notifications = markAllNotificationsRead(state.notifications, state.currentUser.id, action.now);
+      return notifications === state.notifications ? state : { ...state, notifications };
+    }
+
+    case "conversation/started":
+      // Never create a second conversation with the same id.
+      if (state.conversations.some((c) => c.id === action.conversation.id)) return state;
+      return { ...state, conversations: [action.conversation, ...state.conversations] };
+
+    case "conversation/read": {
+      const messages = markConversationRead(state.messages, action.conversationId, state.currentUser.id, action.now);
+      const notifications = markConversationNotificationsRead(
+        state.notifications,
+        action.conversationId,
+        state.currentUser.id,
+        action.now,
+      );
+      if (messages === state.messages && notifications === state.notifications) return state;
+      return { ...state, messages, notifications };
+    }
+
+    case "message/sent": {
+      const conversation = state.conversations.find((c) => c.id === action.message.conversationId);
+      if (!conversation || state.messages.some((m) => m.id === action.message.id)) return state;
+      return {
+        ...state,
+        messages: [...state.messages, action.message],
+        conversations: state.conversations.map((c) =>
+          c.id === conversation.id ? withLastMessage(c, action.message) : c,
+        ),
+        notifications: [...action.notifications, ...state.notifications],
       };
     }
 

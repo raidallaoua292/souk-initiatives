@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CirclePlus, ClipboardList, UserRoundCog, type LucideIcon } from "lucide-react";
+import { Bell, LayoutDashboard, CirclePlus, ClipboardList, MessageSquare, UserRoundCog, type LucideIcon } from "lucide-react";
 import { createElement } from "react";
 import { Avatar } from "@/components/ui/Avatar";
 import { useMockStore } from "@/lib/store";
@@ -38,6 +38,18 @@ const navItems: NavItem[] = [
     isActive: (path) => path === "/dashboard/applications",
   },
   {
+    href: "/dashboard/notifications",
+    label: "الإشعارات",
+    icon: Bell,
+    isActive: (path) => path === "/dashboard/notifications",
+  },
+  {
+    href: "/dashboard/messages",
+    label: "الرسائل",
+    icon: MessageSquare,
+    isActive: (path) => path.startsWith("/dashboard/messages"),
+  },
+  {
     href: "/dashboard/profile",
     label: "الملف الشخصي",
     icon: UserRoundCog,
@@ -48,7 +60,12 @@ const navItems: NavItem[] = [
 /** User summary + navigation. A sticky column on large screens, a compact stacked block on small ones. */
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const { currentUser, wilayas, stats } = useMockStore();
+  const { currentUser, wilayas, stats, getUnreadNotificationsCount, getUnreadMessagesCount } = useMockStore();
+  const badges: Record<string, number> = {
+    "/dashboard/applications": stats.pendingApplications,
+    "/dashboard/notifications": getUnreadNotificationsCount(),
+    "/dashboard/messages": getUnreadMessagesCount(),
+  };
   const wilayaName = wilayas.find((w) => w.slug === currentUser.wilayaSlug)?.name;
 
   return (
@@ -81,14 +98,14 @@ export function DashboardSidebar() {
                   >
                     {createElement(item.icon, { className: "h-4 w-4", "aria-hidden": true })}
                     {item.label}
-                    {item.href === "/dashboard/applications" && stats.pendingApplications > 0 && (
+                    {(badges[item.href] ?? 0) > 0 && (
                       <span
                         className={cn(
                           "ms-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold",
                           active ? "bg-white/20 text-white" : "bg-accent text-white",
                         )}
                       >
-                        {stats.pendingApplications}
+                        {badges[item.href]}
                       </span>
                     )}
                   </Link>

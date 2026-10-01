@@ -4,3 +4,7 @@ export * from "./user-service";
 export * from "./initiative-service";
 export * from "./dashboard-service";
 export * from "./application-service";
+export * from "./notification-service";
+export * from "./conversation-service";
+export * from "./message-service";
+export * from "./people-service";

@@ -57,3 +57,20 @@ Everything below runs on the in-memory store (`lib/store`). **Data is temporary 
 - **Review applications (owner)** — `/dashboard/initiatives/[id]/applications`: filter by status/role, Arabic-normalised search, accept or reject with a note (a reason is required to reject). A decided application cannot be decided again.
 - **Team** — `/dashboard/initiatives/[id]/team`: accepted members, change role, remove with confirmation. Team membership is derived from ACCEPTED applications, so both pages always agree; removing a member sets the application to WITHDRAWN (by owner).
 - **Layers:** types in `types/application.ts`, `types/participation.ts`; pure rules in `lib/applications/domain.ts`; store actions return `Result<T>`.
+
+## Notifications & messaging (mock, client-side)
+
+Same in-memory store as above: **temporary demo data**, reset on a full reload. No realtime, WebSockets, API routes or persistence.
+
+- **Bell** in the navbar: unread badge, dropdown with the 6 latest notifications, mark one / all as read, link to `/dashboard/notifications`.
+- **Notification center** `/dashboard/notifications`: all / unread tabs, type icons, relative time, empty state. Unread = `readAt` is undefined.
+- **Messages** `/dashboard/messages` and `/dashboard/messages/[conversationId]`: 1-to-1 text conversations, each optionally tied to an initiative (title resolved from `initiativeId`). Desktop shows list + conversation; mobile shows one pane at a time. Opening a conversation marks it (and its notification) read.
+- **Auto-notifications** (built in `lib/notifications/events.ts`, wired in the store): application received / accepted / rejected / withdrawn, new member, member removed, role changed, new message.
+- **Mock-user note:** there is one demo user (`usr-01`), so notifications addressed to other people (e.g. the applicant after you accept) are created in the store but only the demo user's are shown.
+- Layers: `types/{notification,conversation,message}.ts` → `lib/mock-data` → `lib/services` → `lib/notifications` + `lib/messaging` (pure rules) → store → `components/{notifications,messaging}`.
+
+## Discovery: people directory (mock)
+
+- `/people` — search (name, bio, wilaya, skills, interests; Arabic-normalised), filter by wilaya and skill, filters seeded from `?query=&wilaya=&skill=`. Only wilayas that have members are offered.
+- `/people/[id]` — public profile: bio, skills, interests, initiatives organised, team participations (accepted applications). "مراسلة" opens or reuses the 1-to-1 conversation (`startConversation`); on your own profile it links to profile editing.
+- Layers: `types/person.ts` → `lib/services/people-service.ts` → `lib/people/domain.ts` (pure filters) → `components/people/*`. All members are seeded as store contacts so any of them can be messaged.

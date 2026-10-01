@@ -1,4 +1,7 @@
 import type { Application } from "./application";
+import type { Conversation } from "./conversation";
+import type { Message } from "./message";
+import type { Notification } from "./notification";
 import type { Category } from "./category";
 import type { Initiative, InitiativeWithRelations } from "./initiative";
 import type { User } from "./user";
@@ -17,6 +20,13 @@ export interface MockStoreSeed {
   initiativeSnapshots: InitiativeWithRelations[];
   /** Applicants on the user's initiatives (everyone except the current user). */
   applicants: User[];
+  /** The current user's notifications. */
+  notifications: Notification[];
+  /** Conversations the current user takes part in. */
+  conversations: Conversation[];
+  messages: Message[];
+  /** The other participants of those conversations (they may not be applicants). */
+  contacts: User[];
 }
 
 export interface DashboardStats {

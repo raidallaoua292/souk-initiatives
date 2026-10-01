@@ -13,3 +13,8 @@ export { ParticipationRole } from "./participation";
 export type { ParticipationOpportunity } from "./participation";
 export { ApplicationStatus, AvailabilityOption, CommitmentLevel } from "./application";
 export type { Application, ApplicationWithRelations, WithdrawnBy } from "./application";
+export { NotificationType } from "./notification";
+export type { Notification } from "./notification";
+export type { Conversation, ConversationWithRelations } from "./conversation";
+export type { Message } from "./message";
+export * from "./person";
